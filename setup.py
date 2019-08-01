@@ -3,7 +3,7 @@ from setuptools import setup
 
 # version info
 NAME = "pypalette"
-VERSION = "0.1.5"
+VERSION = "0.1.6"
 DESC = "Extract prominent colors from images! Python wrapper for `https://github.com/dayvonjersen/vibrant`."
 
 # requirements
@@ -27,7 +27,6 @@ setup(
         'License :: OSI Approved :: MIT License',
         'Natural Language :: English',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',

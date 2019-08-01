@@ -15,20 +15,6 @@ _cur_dir = os.path.dirname(__file__)
 _is_linux = platform.system().lower().find("linux") > -1
 
 
-def go_calc_palette(img_base64: str, max_color_count: int = 8) -> str:
-    """ golang  """
-    if _is_linux:
-        go_palette = cdll.LoadLibrary(os.path.join(_cur_dir, "go-palette-linux.so"))
-    else:
-        go_palette = cdll.LoadLibrary(os.path.join(_cur_dir, "go-palette-mac.so"))
-
-    go_palette.CalcPalette.argtypes = [c_char_p, c_int]
-    go_palette.CalcPalette.restype = c_char_p
-
-    resp = go_palette.CalcPalette(img_base64.encode("utf-8"), max_color_count)
-    return resp.decode("utf-8")
-
-
 class ThemeResult(dict):
     """ 主题色结果 """
     Vibrant = "Vibrant"  # 活力
@@ -71,9 +57,24 @@ class ThemeResult(dict):
 class ImageThemeTools(object):
     def __init__(self, logger: logging.Logger):
         self.logger = logger
+        self._dll = None
 
-    @staticmethod
-    def get_theme_color(image: Image.Image, logger: logging.Logger = None) -> ThemeResult:
+    def go_calc_palette(self, img_base64: str, max_color_count: int = 8) -> str:
+        """ golang  """
+        if self._dll is None:
+            if _is_linux:
+                go_palette = cdll.LoadLibrary(os.path.join(_cur_dir, "go-palette-linux.so"))
+            else:
+                go_palette = cdll.LoadLibrary(os.path.join(_cur_dir, "go-palette-mac.so"))
+
+            go_palette.CalcPalette.argtypes = [c_char_p, c_int]
+            go_palette.CalcPalette.restype = c_char_p
+            self._dll = go_palette
+
+        resp = self._dll.CalcPalette(img_base64.encode("utf-8"), max_color_count)
+        return resp.decode("utf-8")
+
+    def get_theme_color(self, image: Image.Image, max_color_count: int = None) -> ThemeResult:
         """ 获取主题颜色 """
         # base64
         output_buffer = BytesIO()
@@ -82,7 +83,10 @@ class ImageThemeTools(object):
         base64_str = base64.b64encode(byte_data).decode("utf-8")
 
         # 获取结果
-        result_str = go_calc_palette(img_base64=base64_str)
+        if max_color_count is not None:
+            result_str = self.go_calc_palette(img_base64=base64_str, max_color_count=max_color_count)
+        else:
+            result_str = self.go_calc_palette(img_base64=base64_str)
 
         # 转为模型
         result_dict = {}
@@ -94,23 +98,21 @@ class ImageThemeTools(object):
 
         return ThemeResult(result_dict)
 
-    @staticmethod
-    def get_theme_color_for_image_path(image_path: str, logger: logging.Logger = None) -> ThemeResult:
+    def get_theme_color_for_image_path(self, image_path: str, max_color_count: int = None) -> ThemeResult:
         img = Image.open(image_path)
-        return ImageThemeTools.get_theme_color(image=img, logger=logger)
+        return self.get_theme_color(image=img, max_color_count=max_color_count)
 
-    @staticmethod
-    def get_theme_color_for_image_url(url: str, logger: logging.Logger = None) -> ThemeResult:
+    def get_theme_color_for_image_url(self, url: str, max_color_count: int = None) -> ThemeResult:
         """ 获取主题颜色 """
         image = Image.open(BytesIO(requests.get(url, timeout=15).content))
-        return ImageThemeTools.get_theme_color(image=image, logger=logger)
+        return self.get_theme_color(image=image, max_color_count=max_color_count)
 
-    @staticmethod
-    def theme_visual(image_path: str, logger: logging.Logger = None):
+    def theme_visual(self, image_path: str, max_color_count: int = None):
         """ 主题色可视化 """
 
         # 主题结果
-        theme_result = ImageThemeTools.get_theme_color_for_image_path(image_path=image_path, logger=logger)
+        theme_result = self.get_theme_color_for_image_path(
+            image_path=image_path, max_color_count=max_color_count)
 
         # 打开封面图作为前景色
         img = Image.open(image_path)
